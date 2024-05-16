@@ -251,3 +251,89 @@ export default IndexPage;
 
 
 
+// utils/axiosWithTimeout.ts
+
+import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
+
+const axiosInstance: AxiosInstance = axios.create({
+    timeout: 360000, // 6 minutes
+});
+
+axiosInstance.interceptors.response.use(
+    (response: AxiosResponse) => response,
+    (error: AxiosError) => {
+        if (error.code === 'ECONNABORTED') {
+            return Promise.reject(new Error('Request timed out'));
+        }
+        return Promise.reject(error);
+    }
+);
+
+export default axiosInstance;
+
+
+// pages/api/fetchData.ts
+
+import { NextApiRequest, NextApiResponse } from 'next';
+import axiosWithTimeout from '../../utils/axiosWithTimeout';
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
+    const apiUrl = 'https://api.example.com/long-response';
+
+    try {
+        const response = await axiosWithTimeout.get(apiUrl);
+        res.status(200).json(response.data);
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+}
+
+
+
+// pages/index.tsx
+
+import { useState, useEffect } from 'react';
+
+interface DataType {
+    // Define the shape of the data you expect from the API
+    [key: string]: any;
+}
+
+const IndexPage: React.FC = () => {
+    const [data, setData] = useState<DataType | null>(null);
+    const [loading, setLoading] = useState<boolean>(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const response = await fetch('/api/fetchData');
+                if (!response.ok) {
+                    throw new Error(`Fetch failed with status: ${response.status}`);
+                }
+                const result = await response.json();
+                setData(result);
+            } catch (error) {
+                setError((error as Error).message);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, []);
+
+    if (loading) return <p>Loading...</p>;
+    if (error) return <p>Error: {error}</p>;
+
+    return (
+        <div>
+            <h1>Data from API</h1>
+            <pre>{JSON.stringify(data, null, 2)}</pre>
+        </div>
+    );
+};
+
+export default IndexPage;
+
+
