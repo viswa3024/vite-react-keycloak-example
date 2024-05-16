@@ -135,3 +135,37 @@ export default async function handler(req, res) {
 }
 
 
+
+
+// utils/fetchWithTimeout.js
+
+export const fetchWithTimeout = async (url, options = {}, timeout = 360000) => { // 6 minutes
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    signal.addEventListener('abort', () => {
+        console.log('Fetch request aborted due to timeout');
+    });
+
+    const timeoutId = setTimeout(() => {
+        controller.abort();
+    }, timeout);
+
+    try {
+        const response = await fetch(url, { ...options, signal });
+        if (!response.ok) {
+            throw new Error(`Fetch failed with status: ${response.status}`);
+        }
+        return response;
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            throw new Error('Request timed out');
+        }
+        throw error;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+};
+
+
+
